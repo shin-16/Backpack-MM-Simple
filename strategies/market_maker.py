@@ -71,6 +71,9 @@ class MarketMaker:
         elif exchange == 'apex':
             from api.apex_client import ApexClient
             self.client = ApexClient(self.exchange_config)
+        elif exchange == 'zoomex':
+            from api.zoomex_client import ZoomexClient
+            self.client = ZoomexClient(self.exchange_config)
         else:
             raise ValueError(f"不支持的交易所: {exchange}")
             

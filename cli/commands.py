@@ -102,7 +102,7 @@ def _resolve_api_credentials(exchange: str, api_key: Optional[str], secret_key: 
 def _get_client(api_key=None, secret_key=None, exchange='backpack', exchange_config=None):
     """獲取緩存的客户端實例，避免重複創建"""
     exchange = (exchange or 'backpack').lower()
-    if exchange not in ('backpack', 'aster', 'paradex', 'lighter', 'apex'):
+    if exchange not in ('backpack', 'aster', 'paradex', 'lighter', 'apex', 'zoomex'):
         raise ValueError(f"不支持的交易所: {exchange}")
 
     config = dict(exchange_config or {})
@@ -207,6 +207,9 @@ def _get_client(api_key=None, secret_key=None, exchange='backpack', exchange_con
             client_cls = ParadexClient
         elif exchange == 'lighter':
             client_cls = LighterClient
+        elif exchange == 'zoomex':
+            from api.zoomex_client import ZoomexClient
+            client_cls = ZoomexClient
         else:  # apex
             client_cls = ApexClient
         _client_cache[cache_key] = client_cls(config)
@@ -585,7 +588,7 @@ def run_market_maker_command(api_key, secret_key):
     exchange_input = input("請選擇交易所 (backpack/aster/paradex/lighter/apex，默認 backpack): ").strip().lower()
 
     # 處理交易所選擇
-    if exchange_input in ('backpack', 'aster', 'paradex', 'lighter', 'apex', ''):
+    if exchange_input in ('backpack', 'aster', 'paradex', 'lighter', 'apex', 'zoomex', ''):
         exchange = exchange_input if exchange_input else 'backpack'
     else:
         print(f"警告: 不識別的交易所 '{exchange_input}'，使用默認 'backpack'")
@@ -643,6 +646,13 @@ def run_market_maker_command(api_key, secret_key):
             'secret_key': secret_key,
             'passphrase': os.getenv('APEX_PASSPHRASE', ''),
             'base_url': os.getenv('APEX_BASE_URL', 'https://omni.apex.exchange'),
+        }
+    elif exchange == 'zoomex':
+        exchange_config = {
+            'api_key': api_key,
+            'api_secret': secret_key,
+            'base_url': os.getenv('ZOOMEX_BASE_URL', 'https://openapi.zoomex.com'),
+            'category': 'linear',
         }
     else:
         print("錯誤：不支持的交易所。")

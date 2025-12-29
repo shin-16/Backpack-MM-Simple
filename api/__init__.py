@@ -7,12 +7,14 @@ from .base_client import BaseExchangeClient
 from .bp_client import BPClient
 from .aster_client import AsterClient
 from .lighter_client import LighterClient  # 輕量依賴，可安全頂層導入
+from .zoomex_client import ZoomexClient  # Zoomex V3 API client
 
 __all__ = [
     "BaseExchangeClient",
     "BPClient",
     "AsterClient",
     "LighterClient",
+    "ZoomexClient",
     "get_client",
 ]
 
@@ -25,10 +27,12 @@ def get_client(name: str, *args, **kwargs):
         # 只有真的需要時才導入，避免在 lighter 路徑拉起 starkware/cairo 舊依賴
         from .paradex_client import ParadexClient
         return ParadexClient(*args, **kwargs)
-    elif name == "bp":
+    elif name == "bp" or name == "backpack":
         return BPClient(*args, **kwargs)
     elif name == "aster":
         return AsterClient(*args, **kwargs)
+    elif name == "zoomex":
+        return ZoomexClient(*args, **kwargs)
     else:
         raise ValueError(f"未知交易所: {name}")
 

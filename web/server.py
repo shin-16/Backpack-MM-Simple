@@ -178,6 +178,17 @@ def start_bot():
                 'zk_seeds': zk_seeds,
                 'base_url': base_url,
             }
+        elif exchange == 'zoomex':
+            api_key = os.getenv('ZOOMEX_API_KEY', '')
+            secret_key = os.getenv('ZOOMEX_API_SECRET', '')
+            base_url = os.getenv('ZOOMEX_BASE_URL', 'https://openapi.zoomex.com')
+
+            exchange_config = {
+                'api_key': api_key,
+                'api_secret': secret_key,
+                'base_url': base_url,
+                'category': 'linear',  # USDT perpetuals
+            }
         else:
             return jsonify({'success': False, 'message': f'不支持的交易所: {exchange}'}), 400
 
@@ -455,7 +466,7 @@ def stop_bot():
 def get_config():
     """獲取配置信息"""
     return jsonify({
-        'exchanges': ['backpack', 'aster', 'paradex', 'lighter', 'apex'],
+        'exchanges': ['backpack', 'aster', 'paradex', 'lighter', 'apex', 'zoomex'],
         'market_types': ['spot', 'perp'],
         'strategies': ['standard', 'maker_hedge', 'grid'],
         'env_configured': {
@@ -463,7 +474,8 @@ def get_config():
             'aster': bool(os.getenv('ASTER_API_KEY') and os.getenv('ASTER_SECRET_KEY')),
             'paradex': bool(os.getenv('PARADEX_PRIVATE_KEY') and os.getenv('PARADEX_ACCOUNT_ADDRESS')),
             'lighter': bool(os.getenv('LIGHTER_PRIVATE_KEY') and os.getenv('LIGHTER_PUBLIC_KEY')),
-            'apex': bool(os.getenv('APEX_API_KEY') and os.getenv('APEX_SECRET_KEY'))
+            'apex': bool(os.getenv('APEX_API_KEY') and os.getenv('APEX_SECRET_KEY')),
+            'zoomex': bool(os.getenv('ZOOMEX_API_KEY') and os.getenv('ZOOMEX_API_SECRET'))
         }
     })
 

@@ -57,6 +57,25 @@ PARADEX_BASE_URL = os.getenv('PARADEX_BASE_URL', 'https://api.prod.paradex.trade
 PARADEX_SIGNATURE_TTL_SECONDS = int(os.getenv('PARADEX_SIGNATURE_TTL_SECONDS', '1800'))  # 30分鐘
 PARADEX_JWT_REFRESH_BUFFER = int(os.getenv('PARADEX_JWT_REFRESH_BUFFER', '120'))  # 提前2分鐘刷新
 
+# ==================== Zoomex 交易所配置 ====================
+
+# Zoomex API 憑證
+ZOOMEX_API_KEY = os.getenv('ZOOMEX_API_KEY', '')
+ZOOMEX_API_SECRET = os.getenv('ZOOMEX_API_SECRET', '')
+
+# Zoomex API 端點
+ZOOMEX_BASE_URL = os.getenv('ZOOMEX_BASE_URL', 'https://openapi.zoomex.com')
+ZOOMEX_TESTNET_URL = os.getenv('ZOOMEX_TESTNET_URL', 'https://openapi-testnet.zoomex.com')
+
+# Zoomex WebSocket 端點
+ZOOMEX_WS_PUBLIC_URL = os.getenv('ZOOMEX_WS_PUBLIC_URL', 'wss://stream.zoomex.com/v5/public/linear')
+ZOOMEX_WS_PRIVATE_URL = os.getenv('ZOOMEX_WS_PRIVATE_URL', 'wss://stream.zoomex.com/v3/private')
+
+# Zoomex 設定
+ZOOMEX_RECV_WINDOW = os.getenv('ZOOMEX_RECV_WINDOW', '5000')
+ZOOMEX_CATEGORY = os.getenv('ZOOMEX_CATEGORY', 'linear')  # linear, inverse, spot
+
+
 # ==================== 向後兼容性（保留舊變數名） ====================
 # 注意：這些變數已被標記為 Deprecated，建議使用上面的 BACKPACK_ 前綴變數
 
