@@ -291,6 +291,7 @@ class ZoomexClient(BaseExchangeClient):
         """Get wallet balance.
         
         Endpoint: GET /cloud/trade/v3/account/wallet-balance
+        Returns dict keyed by asset name for compatibility with strategies.
         """
         endpoint = "/cloud/trade/v3/account/wallet-balance"
         params = {"accountType": "UNIFIED"}  # or CONTRACT for classic
@@ -304,33 +305,32 @@ class ZoomexClient(BaseExchangeClient):
         account_list = result.get("list", [])
         
         if not account_list:
-            return {"balances": [], "raw": result}
+            return {}
 
         account = account_list[0]
         coins = account.get("coin", [])
         
-        balances = []
+        # Return dict keyed by asset name for compatibility with strategies
+        balances = {}
         for coin in coins:
-            balances.append({
-                "asset": coin.get("coin"),
-                "available": coin.get("availableToWithdraw"),
-                "total": coin.get("walletBalance"),
-                "equity": coin.get("equity"),
-                "unrealizedPnl": coin.get("unrealisedPnl")
-            })
+            asset = coin.get("coin")
+            if asset:
+                balances[asset] = {
+                    "asset": asset,
+                    "available": float(coin.get("availableToWithdraw", 0) or 0),
+                    "locked": float(coin.get("locked", 0) or 0),
+                    "total": float(coin.get("walletBalance", 0) or 0),
+                    "equity": float(coin.get("equity", 0) or 0),
+                    "unrealizedPnl": float(coin.get("unrealisedPnl", 0) or 0)
+                }
         
-        return {
-            "accountType": account.get("accountType"),
-            "balances": balances,
-            "totalEquity": account.get("totalEquity"),
-            "totalAvailableBalance": account.get("totalAvailableBalance"),
-            "raw": account
-        }
+        return balances
 
-    def get_positions(self, symbol: Optional[str] = None) -> Dict:
+    def get_positions(self, symbol: Optional[str] = None) -> Any:
         """Get position information.
         
         Endpoint: GET /cloud/trade/v3/position/list
+        Returns list of positions for compatibility with strategies.
         """
         endpoint = "/cloud/trade/v3/position/list"
         params = {"category": self.category}
@@ -348,24 +348,40 @@ class ZoomexClient(BaseExchangeClient):
         result = response.get("result", {})
         position_list = result.get("list", [])
         
+        # Return list directly for compatibility with strategies
         positions = []
         for pos in position_list:
-            size = float(pos.get("size", 0))
+            size = float(pos.get("size", 0) or 0)
             if size > 0:  # Only include non-zero positions
+                side = pos.get("side", "")
+                # Normalize side to LONG/SHORT format
+                if side.upper() == "BUY":
+                    mapped_side = "LONG"
+                    net_qty = size
+                elif side.upper() == "SELL":
+                    mapped_side = "SHORT"
+                    net_qty = -size
+                else:
+                    mapped_side = side.upper() if side else "FLAT"
+                    net_qty = size if mapped_side == "LONG" else -size
+                
                 positions.append({
                     "symbol": pos.get("symbol"),
-                    "side": pos.get("side"),
-                    "size": size,
+                    "side": mapped_side,
+                    "positionSide": mapped_side,
+                    "size": str(size),
+                    "netQuantity": str(net_qty),
                     "entryPrice": pos.get("avgPrice"),
                     "markPrice": pos.get("markPrice"),
                     "unrealizedPnl": pos.get("unrealisedPnl"),
+                    "pnlUnrealized": pos.get("unrealisedPnl"),
                     "leverage": pos.get("leverage"),
                     "liquidationPrice": pos.get("liqPrice"),
                     "positionValue": pos.get("positionValue"),
                     "raw": pos
                 })
         
-        return {"positions": positions, "raw": result}
+        return positions
 
     # ------------------------------------------------------------------
     # Order Methods (Private)
@@ -477,10 +493,11 @@ class ZoomexClient(BaseExchangeClient):
             "raw": result
         }
 
-    def get_open_orders(self, symbol: Optional[str] = None) -> Dict:
+    def get_open_orders(self, symbol: Optional[str] = None) -> Any:
         """Get open orders.
         
         Endpoint: GET /cloud/trade/v3/order/realtime
+        Returns list of orders for compatibility with strategies.
         """
         endpoint = "/cloud/trade/v3/order/realtime"
         params = {
@@ -501,6 +518,7 @@ class ZoomexClient(BaseExchangeClient):
         result = response.get("result", {})
         order_list = result.get("list", [])
         
+        # Return list directly for compatibility with strategies
         orders = []
         for order in order_list:
             orders.append({
@@ -518,7 +536,7 @@ class ZoomexClient(BaseExchangeClient):
                 "raw": order
             })
         
-        return {"orders": orders, "raw": result}
+        return orders
 
     # ------------------------------------------------------------------
     # Helper Methods
