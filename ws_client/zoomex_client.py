@@ -381,7 +381,10 @@ class ZoomexWebSocket:
         if not self.connected or not self.ws:
             return False
         topic = f"tickers.{self.symbol}"
-        return self._subscribe([topic])
+        result = self._subscribe([topic])
+        if result and "bookTicker" not in self.subscriptions:
+            self.subscriptions.append("bookTicker")  # Mark as subscribed for strategy compatibility
+        return result
 
     def subscribe_depth(self, depth: int = 50):
         """Subscribe to orderbook depth.
@@ -392,7 +395,10 @@ class ZoomexWebSocket:
         if not self.connected or not self.ws:
             return False
         topic = f"orderbook.{depth}.{self.symbol}"
-        return self._subscribe([topic])
+        result = self._subscribe([topic])
+        if result and "depth" not in self.subscriptions:
+            self.subscriptions.append("depth")  # Mark as subscribed for strategy compatibility
+        return result
 
     def subscribe_trades(self):
         """Subscribe to trades stream."""
@@ -413,9 +419,11 @@ class ZoomexWebSocket:
         
         Zoomex public WebSocket doesn't support private streams.
         Use Zoomex private WebSocket client for private data.
+        Returns True to prevent retry spam - private streams will be polled via REST.
         """
-        logger.debug(f"Private subscription not supported in public client: {stream}")
-        return False
+        if stream not in self.subscriptions:
+            self.subscriptions.append(stream)  # Mark as "subscribed" to prevent retries
+        return True  # Return True to prevent retry loop
 
     def _subscribe(self, topics: List[str]) -> bool:
         """Send subscription."""

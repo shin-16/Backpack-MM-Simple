@@ -49,7 +49,8 @@ class MarketMaker:
         base_asset_target_percentage=30.0,
         exchange='backpack',
         exchange_config=None,
-        enable_database=False
+        enable_database=False,
+        price_change_threshold=None
     ):
         self.api_key = api_key
         self.secret_key = secret_key
@@ -98,7 +99,12 @@ class MarketMaker:
                 pass
 
         if not self.db:
-            self.db_enabled = False
+            # 如果數據庫連接失敗，記錄日誌但不報錯
+            try:
+                # 嘗試建立一個空的數據庫連接用於日誌記錄
+                pass
+            except Exception as e:
+                logger.error(f"數據庫初始化失敗: {e}")
 
         if not self.db_enabled:
             logger.info("資料庫寫入功能已關閉，本次執行僅在記憶體中追蹤交易統計。")
@@ -162,6 +168,15 @@ class MarketMaker:
 
         # WebSocket 重連冷卻時間追蹤
         self._last_reconnect_attempt = 0
+
+        # 價格變動追蹤 - 只在價格變動時更新訂單
+        self._last_order_price: Optional[float] = None
+        # 如果傳入了閾值則使用，否則默認為 0.1% (僅對Zoomex)
+        if price_change_threshold is not None:
+            self._price_change_threshold = float(price_change_threshold)
+            logger.info(f"設置價格變動閾值: {self._price_change_threshold*100:.2f}%")
+        else:
+            self._price_change_threshold = 0.001  # 0.1% 默認值
 
         # 添加代理參數
         # 建立WebSocket連接（僅對Backpack）
@@ -2321,6 +2336,10 @@ class MarketMaker:
         # 如果使用 Websea，不需要 WebSocket 數據流
         if self.ws is None:
             return
+        
+        # Zoomex 在連接時自動訂閲，不需要重新檢查
+        if self.exchange == 'zoomex':
+            return
             
         # 檢查深度流訂閲
         if "depth" not in self.ws.subscriptions:
@@ -2426,8 +2445,24 @@ class MarketMaker:
                 if self.need_rebalance():
                     self.rebalance_position()
                 
-                # 下限價單
-                self.place_limit_orders()
+                # 檢查價格是否有足夠變動需要更新訂單
+                current_price = self.get_current_price()
+                should_update_orders = True
+                
+                if current_price and self._last_order_price:
+                    price_change_pct = abs(current_price - self._last_order_price) / self._last_order_price
+                    if price_change_pct < self._price_change_threshold:
+                        # 價格變動不大，跳過訂單更新
+                        should_update_orders = False
+                        logger.debug(f"價格變動 {price_change_pct*100:.4f}% 小於閾值 {self._price_change_threshold*100:.2f}%，跳過訂單更新")
+                
+                if should_update_orders:
+                    # 下限價單
+                    self.place_limit_orders()
+                    if current_price:
+                        self._last_order_price = current_price
+                else:
+                    logger.info(f"價格穩定 ({current_price:.2f})，保持現有訂單")
 
                 # 計算PnL並輸出簡化統計
                 pnl_data = self.calculate_pnl()

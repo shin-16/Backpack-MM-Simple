@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     adjustMarketTypeOptions();
     toggleSpreadField();
     toggleGridTypeField();
+    toggleIntervalField();
 });
 
 // 初始化WebSocket連接
@@ -146,12 +147,38 @@ function setupEventListeners() {
     exchangeSelect.addEventListener('change', () => {
         // 根據交易所調整可用的市場類型選項
         adjustMarketTypeOptions();
+        // 針對有WebSocket的交易所隱藏間隔設定
+        toggleIntervalField();
     });
 
     // 自動價格範圍切換
     autoPriceRangeCheckbox.addEventListener('change', () => {
         togglePriceRangeMode();
     });
+}
+
+// 切換間隔設定欄位（有WebSocket的交易所隱藏）
+function toggleIntervalField() {
+    const exchange = exchangeSelect.value;
+    const intervalField = document.getElementById('intervalField');
+    const intervalInput = document.getElementById('interval');
+    const zoomexParams = document.getElementById('zoomexParams');
+
+    // Zoomex和Backpack有WebSocket，使用更短的間隔
+    if (exchange === 'zoomex' || exchange === 'backpack') {
+        intervalField.style.display = 'none';
+        intervalInput.value = '1';  // 1秒間隔（使用WebSocket實時數據）
+    } else {
+        intervalField.style.display = 'block';
+        intervalInput.value = '10';  // 其他交易所使用較長間隔
+    }
+
+    // 只有Zoomex顯示WebSocket特殊設定
+    if (exchange === 'zoomex') {
+        zoomexParams.style.display = 'block';
+    } else {
+        zoomexParams.style.display = 'none';
+    }
 }
 
 // 切換市場類型參數顯示
@@ -370,6 +397,12 @@ async function startBot() {
         enable_db: formData.get('enable_db') === 'on'
     };
 
+    // Zoomex 特定參數
+    if (data.exchange === 'zoomex') {
+        const priceThreshold = formData.get('price_change_threshold');
+        data.price_change_threshold = priceThreshold ? parseFloat(priceThreshold) : 0.1;
+    }
+
     // 根據策略類型添加額外參數
     if (data.strategy === 'grid') {
         // 網格策略參數
@@ -537,7 +570,7 @@ function handleStatusUpdate(data) {
         startBtn.disabled = false;
         startBtn.innerHTML = '<span>啟動機器人</span>';
         stopBtn.disabled = true;
-        stopBtn.innerHTML = '<span>停止機器人</span>'; 
+        stopBtn.innerHTML = '<span>停止機器人</span>';
 
         // 啟用表單輸入
         Array.from(form.elements).forEach(element => {

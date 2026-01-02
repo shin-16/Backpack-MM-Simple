@@ -238,6 +238,9 @@ def start_bot():
         auto_borrow = data.get('auto_borrow', True)  # 自動借貸
         auto_borrow_repay = data.get('auto_borrow_repay', True)  # 自動還款
 
+        # Zoomex WebSocket 特定參數
+        price_change_threshold = float(data.get('price_change_threshold', 0.1)) / 100  # 轉換為小數
+
         # 創建策略實例
         if market_type == 'perp':
             from strategies.perp_market_maker import PerpetualMarketMaker
@@ -304,7 +307,8 @@ def start_bot():
                     take_profit=take_profit,
                     exchange=exchange,
                     exchange_config=exchange_config,
-                    enable_database=enable_db
+                    enable_database=enable_db,
+                    price_change_threshold=price_change_threshold if exchange == 'zoomex' else None
                 )
         else:
             from strategies.market_maker import MarketMaker
