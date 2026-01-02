@@ -7,7 +7,7 @@ import json
 import time
 import threading
 import os
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable, List, Tuple
 import websocket as ws
 from urllib.parse import urlparse
 
@@ -51,6 +51,7 @@ class ZoomexWebSocket:
         self.ws: Optional[ws.WebSocketApp] = None
         self.connected = False
         self.running = False
+        self.subscriptions: List[str] = []  # Track active subscriptions
 
         # Price data
         self.last_price: Optional[float] = None
@@ -125,6 +126,14 @@ class ZoomexWebSocket:
         self.ws_thread = threading.Thread(target=self._ws_run_forever, daemon=True)
         self.ws_thread.start()
         self._start_heartbeat()
+
+    def initialize_orderbook(self) -> bool:
+        """Initialize orderbook - stub for strategy compatibility.
+        
+        Zoomex automatically receives orderbook snapshot when subscribing.
+        Returns True to indicate success.
+        """
+        return True
 
     def _ws_run_forever(self):
         """Run WebSocket event loop."""
@@ -392,6 +401,22 @@ class ZoomexWebSocket:
         topic = f"publicTrade.{self.symbol}"
         return self._subscribe([topic])
 
+    def subscribe_bookTicker(self):
+        """Subscribe to book ticker (best bid/ask) - alias for ticker subscription.
+        
+        For strategy compatibility - Zoomex ticker includes bid1/ask1 prices.
+        """
+        return self.subscribe_ticker()
+
+    def private_subscribe(self, stream: str) -> bool:
+        """Private subscription stub for strategy compatibility.
+        
+        Zoomex public WebSocket doesn't support private streams.
+        Use Zoomex private WebSocket client for private data.
+        """
+        logger.debug(f"Private subscription not supported in public client: {stream}")
+        return False
+
     def _subscribe(self, topics: List[str]) -> bool:
         """Send subscription."""
         try:
@@ -469,3 +494,23 @@ class ZoomexWebSocket:
         if self.bid_price and self.ask_price:
             return (self.bid_price + self.ask_price) / 2
         return self.last_price
+
+    def get_current_price(self) -> Optional[float]:
+        """Get current price (alias for last_price for strategy compatibility)."""
+        return self.last_price
+
+    def get_bid_ask(self) -> Tuple[Optional[float], Optional[float]]:
+        """Get best bid and ask prices for strategy compatibility."""
+        return self.bid_price, self.ask_price
+
+    def check_and_reconnect_if_needed(self) -> bool:
+        """Check connection and trigger reconnect if needed."""
+        if not self.connected and not self.reconnecting:
+            return self.reconnect()
+        return self.connected
+
+    def close(self):
+        """Alias for disconnect() for strategy compatibility."""
+        self.disconnect()
+
+

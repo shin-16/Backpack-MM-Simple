@@ -13,6 +13,7 @@ from api.bp_client import BPClient
 from api.aster_client import AsterClient
 from api.lighter_client import LighterClient
 from ws_client.client import BackpackWebSocket
+from ws_client.zoomex_client import ZoomexWebSocket
 from database.db import Database
 from utils.helpers import round_to_precision, round_to_tick_size, calculate_volatility
 from logger import setup_logger
@@ -167,9 +168,9 @@ class MarketMaker:
         if exchange == 'backpack':
             self.ws = BackpackWebSocket(api_key, secret_key, symbol, self.on_ws_message, auto_reconnect=True)
             self.ws.connect()
-        elif exchange == 'xx':
-            ...
-            self.ws = None
+        elif exchange == 'zoomex':
+            self.ws = ZoomexWebSocket(symbol=symbol, on_message_callback=self.on_ws_message, auto_reconnect=True)
+            self.ws.connect()
         else:
             self.ws = None  # 不使用WebSocket
         # 執行緒池用於後台任務
@@ -377,19 +378,26 @@ class MarketMaker:
         if self.ws.connected:
             logger.info("WebSocket連接已建立，初始化數據流...")
 
-            # 初始化訂單簿
-            orderbook_initialized = self.ws.initialize_orderbook()
+            # Backpack需要額外的初始化步驟
+            if self.exchange == 'backpack':
+                # 初始化訂單簿
+                orderbook_initialized = self.ws.initialize_orderbook()
 
-            # 訂閲深度流和行情數據
-            if orderbook_initialized:
-                depth_subscribed = self.ws.subscribe_depth()
-                ticker_subscribed = self.ws.subscribe_bookTicker()
+                # 訂閲深度流和行情數據
+                if orderbook_initialized:
+                    depth_subscribed = self.ws.subscribe_depth()
+                    ticker_subscribed = self.ws.subscribe_bookTicker()
 
-                if depth_subscribed and ticker_subscribed:
-                    logger.info("數據流訂閲成功!")
+                    if depth_subscribed and ticker_subscribed:
+                        logger.info("數據流訂閲成功!")
 
-            # 訂閲私有訂單更新流
-            self.subscribe_order_updates()
+                # 訂閲私有訂單更新流
+                self.subscribe_order_updates()
+            elif self.exchange == 'zoomex':
+                # Zoomex在連接時自動訂閲ticker和depth，無需額外初始化
+                logger.info("Zoomex WebSocket 自動訂閲完成")
+            else:
+                logger.info(f"{self.exchange} WebSocket 初始化完成")
         else:
             logger.info("WebSocket 初始連接未建立，使用 REST API 模式（WebSocket 將在後台自動重連）")
     
@@ -904,7 +912,7 @@ class MarketMaker:
     def _recreate_websocket(self):
         """重新創建WebSocket連接"""
         try:
-            if self.exchange == 'aster':
+            if self.exchange in ('aster', 'paradex', 'lighter', 'apex'):
                 logger.info(f"{self.exchange} 交易所不使用 WebSocket")
                 return True
             
@@ -912,10 +920,15 @@ class MarketMaker:
             if self.ws:
                 try:
                     self.ws.running = False
-                    self.ws.close()
+                    # Zoomex uses disconnect(), Backpack uses close()
+                    if hasattr(self.ws, 'disconnect'):
+                        self.ws.disconnect()
+                    elif hasattr(self.ws, 'close'):
+                        self.ws.close()
                     time.sleep(0.5)
                 except Exception as e:
                     logger.debug(f"關閉現有WebSocket時的預期錯誤: {e}")
+            
             if self.exchange == 'backpack':
                 # 創建新的連接
                 self.ws = BackpackWebSocket(
@@ -925,8 +938,16 @@ class MarketMaker:
                     self.on_ws_message,
                     auto_reconnect=True
                 )
-            elif self.exchange == 'xx':
-                ...
+            elif self.exchange == 'zoomex':
+                self.ws = ZoomexWebSocket(
+                    symbol=self.symbol,
+                    on_message_callback=self.on_ws_message,
+                    auto_reconnect=True
+                )
+            else:
+                logger.warning(f"{self.exchange} 不支持 WebSocket")
+                return False
+                
             self.ws.connect()
             
             # 等待連接建立，但不要等太久
@@ -939,11 +960,13 @@ class MarketMaker:
             if self.ws.is_connected():
                 logger.info("WebSocket重新創建成功")
                 
-                # 重新初始化
-                self.ws.initialize_orderbook()
-                self.ws.subscribe_depth()
-                self.ws.subscribe_bookTicker()
-                self.subscribe_order_updates()
+                # 重新初始化 - Backpack特有方法
+                if self.exchange == 'backpack':
+                    self.ws.initialize_orderbook()
+                    self.ws.subscribe_depth()
+                    self.ws.subscribe_bookTicker()
+                    self.subscribe_order_updates()
+                # Zoomex會在連接時自動訂閱ticker和depth
                 return True
             else:
                 logger.warning("WebSocket重新創建後仍未連接，但繼續運行")

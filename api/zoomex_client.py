@@ -294,7 +294,7 @@ class ZoomexClient(BaseExchangeClient):
         Returns dict keyed by asset name for compatibility with strategies.
         """
         endpoint = "/cloud/trade/v3/account/wallet-balance"
-        params = {"accountType": "UNIFIED"}  # or CONTRACT for classic
+        params = {"accountType": "CONTRACT"}  # CONTRACT for perpetuals
         
         response = self.make_request("GET", endpoint, params=params)
         
@@ -395,9 +395,9 @@ class ZoomexClient(BaseExchangeClient):
         Args:
             order_details: Dict with keys:
                 - symbol: Trading pair (e.g., "BTCUSDT")
-                - side: "Buy" or "Sell"
+                - side: "Buy" or "Sell" (also accepts "Bid"/"Ask" which will be converted)
                 - orderType: "Market" or "Limit"
-                - qty: Order quantity
+                - qty: Order quantity (also accepts "quantity")
                 - price: Order price (required for limit orders)
                 - timeInForce: "GTC", "IOC", "FOK", "PostOnly"
                 - positionIdx: 0 (one-way), 1 (hedge-buy), 2 (hedge-sell)
@@ -405,13 +405,32 @@ class ZoomexClient(BaseExchangeClient):
         """
         endpoint = "/cloud/trade/v3/order/create"
         
+        # Normalize side: convert "Bid"/"Ask" to "Buy"/"Sell" for Zoomex API
+        raw_side = order_details.get("side", "")
+        side_mapping = {
+            "Bid": "Buy",
+            "bid": "Buy",
+            "BID": "Buy",
+            "Ask": "Sell",
+            "ask": "Sell",
+            "ASK": "Sell",
+            "buy": "Buy",
+            "BUY": "Buy",
+            "sell": "Sell",
+            "SELL": "Sell",
+        }
+        normalized_side = side_mapping.get(raw_side, raw_side)
+        
+        # Normalize quantity: accept both "qty" and "quantity"
+        qty = order_details.get("qty") or order_details.get("quantity")
+        
         # Build order payload
         data = {
             "category": self.category,
             "symbol": order_details.get("symbol"),
-            "side": order_details.get("side"),
+            "side": normalized_side,
             "orderType": order_details.get("orderType", "Limit"),
-            "qty": str(order_details.get("qty")),
+            "qty": str(qty),
             "positionIdx": order_details.get("positionIdx", 0)
         }
         
