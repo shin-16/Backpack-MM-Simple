@@ -209,7 +209,7 @@ def start_bot():
         quantity = float(data.get('quantity', 0)) if data.get('quantity') else None
         max_orders = int(data.get('max_orders', 3))
         duration = int(data.get('duration', 3600))
-        interval = int(data.get('interval', 60))
+        interval = float(data.get('interval', 60))
         market_type = data.get('market_type', 'spot')
         strategy_name = data.get('strategy', 'standard')
         enable_db = data.get('enable_db', False)

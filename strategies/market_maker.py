@@ -177,6 +177,9 @@ class MarketMaker:
             logger.info(f"設置價格變動閾值: {self._price_change_threshold*100:.2f}%")
         else:
             self._price_change_threshold = 0.001  # 0.1% 默認值
+            
+        # 事件驅動控制 (用於實時響應 WebSocket 更新)
+        self.price_update_event = threading.Event()
 
         # 添加代理參數
         # 建立WebSocket連接（僅對Backpack）
@@ -993,6 +996,11 @@ class MarketMaker:
     
     def on_ws_message(self, stream, data):
         """處理WebSocket消息回調"""
+        # 如果收到行情或深度更新，觸發事件喚醒主循環 (僅針對 Zoomex)
+        if self.exchange == 'zoomex':
+            if stream.startswith("tickers.") or stream.startswith("orderbook."):
+                self.price_update_event.set()
+                
         if stream.startswith("account.orderUpdate."):
             event_type = data.get('e')
             
@@ -2489,8 +2497,21 @@ class MarketMaker:
                     break
 
                 wait_time = interval_seconds
-                logger.info(f"等待 {wait_time} 秒後進行下一次迭代...")
-                time.sleep(wait_time)
+                
+                # 對於 Zoomex，使用事件驅動等待，實現實時響應
+                if self.exchange == 'zoomex':
+                    # 等待價格更新事件或超時
+                    # 如果有事件觸發，wait 返回 True，循環立即繼續
+                    # 如果超時，wait 返回 False，循環繼續
+                    self.price_update_event.wait(timeout=wait_time)
+                    self.price_update_event.clear()
+                else:
+                    # 其他交易所使用傳統睡眠
+                    if wait_time >= 1.0:
+                        logger.info(f"等待 {wait_time} 秒後進行下一次迭代...")
+                    else:
+                        logger.debug(f"等待 {wait_time} 秒後進行下一次迭代...")
+                    time.sleep(wait_time)
 
             # 結束運行時打印最終報表
             logger.info("\n=== 做市策略運行結束 ===")

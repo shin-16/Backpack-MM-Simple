@@ -167,7 +167,7 @@ function toggleIntervalField() {
     // Zoomex和Backpack有WebSocket，使用更短的間隔
     if (exchange === 'zoomex' || exchange === 'backpack') {
         intervalField.style.display = 'none';
-        intervalInput.value = '1';  // 1秒間隔（使用WebSocket實時數據）
+        intervalInput.value = '0.1';  // 0.1秒間隔（高頻輪詢配合閾值檢查）
     } else {
         intervalField.style.display = 'block';
         intervalInput.value = '10';  // 其他交易所使用較長間隔
@@ -393,7 +393,7 @@ async function startBot() {
         market_type: formData.get('market_type'),
         strategy: formData.get('strategy'),
         duration: parseInt(formData.get('duration')),
-        interval: parseInt(formData.get('interval')),
+        interval: parseFloat(formData.get('interval')),
         enable_db: formData.get('enable_db') === 'on'
     };
 
