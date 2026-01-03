@@ -283,6 +283,79 @@ class ZoomexClient(BaseExchangeClient):
             "list": result.get("list", [])
         }
 
+    def get_symbol_info(self, symbol: str) -> Optional[Dict]:
+        """Get symbol information including precision and limits.
+        
+        Args:
+            symbol: Trading pair (e.g., "ETHUSDT")
+            
+        Returns:
+            Dict with symbol info or None if not found.
+        """
+        params = {
+            "category": "linear",
+            "symbol": symbol
+        }
+        
+        response = self.make_request(
+            method="GET",
+            endpoint="/cloud/trade/v3/market/instruments-info",
+            params=params
+        )
+        
+        if "error" in response:
+            logger.error(f"Failed to get symbol info: {response['error']}")
+            return None
+            
+        result = response.get("result", {})
+        instruments = result.get("list", [])
+        
+        if not instruments:
+            return None
+            
+        info = instruments[0]
+        
+        # Parse precision from filters
+        lot_size = info.get("lotSizeFilter", {})
+        price_filter = info.get("priceFilter", {})
+        
+        # Calculate precision from step sizes
+        qty_step = lot_size.get("qtyStep", "0.001")
+        tick_size = price_filter.get("tickSize", "0.01")
+        
+        # Count decimal places
+        def count_decimals(value_str):
+            if '.' in str(value_str):
+                return len(str(value_str).split('.')[1].rstrip('0'))
+            return 0
+        
+        base_precision = count_decimals(qty_step)
+        quote_precision = count_decimals(tick_size)
+        
+        # Extract base/quote from symbol (e.g., ETHUSDT -> ETH, USDT)
+        if symbol.endswith("USDT"):
+            base_asset = symbol[:-4]
+            quote_asset = "USDT"
+        elif symbol.endswith("USDC"):
+            base_asset = symbol[:-4]
+            quote_asset = "USDC"
+        else:
+            base_asset = symbol
+            quote_asset = "USD"
+        
+        return {
+            "symbol": symbol,
+            "base_asset": base_asset,
+            "quote_asset": quote_asset,
+            "base_precision": base_precision,
+            "quote_precision": quote_precision,
+            "tick_size": float(tick_size),
+            "min_order_size": float(lot_size.get("minOrderQty", "0.001")),
+            "max_order_size": float(lot_size.get("maxOrderQty", "1000")),
+            "qty_step": float(qty_step),
+            "raw": info
+        }
+
     # ------------------------------------------------------------------
     # Account Methods (Private)
     # ------------------------------------------------------------------
@@ -455,8 +528,10 @@ class ZoomexClient(BaseExchangeClient):
             return response
 
         result = response.get("result", {})
+        order_id = result.get("orderId")
         return {
-            "orderId": result.get("orderId"),
+            "id": order_id,  # For strategy compatibility
+            "orderId": order_id,
             "orderLinkId": result.get("orderLinkId"),
             "success": True,
             "raw": result
@@ -540,8 +615,10 @@ class ZoomexClient(BaseExchangeClient):
         # Return list directly for compatibility with strategies
         orders = []
         for order in order_list:
+            order_id = order.get("orderId")
             orders.append({
-                "orderId": order.get("orderId"),
+                "id": order_id,  # For strategy compatibility
+                "orderId": order_id,
                 "orderLinkId": order.get("orderLinkId"),
                 "symbol": order.get("symbol"),
                 "side": order.get("side"),
@@ -556,6 +633,62 @@ class ZoomexClient(BaseExchangeClient):
             })
         
         return orders
+
+    def get_fill_history(self, symbol: Optional[str] = None, limit: int = 50) -> List[Dict]:
+        """Get trade execution history.
+        
+        Endpoint: GET /cloud/trade/v3/execution/list
+        
+        Args:
+            symbol: Trading pair (optional)
+            limit: Max number of records (default 50)
+            
+        Returns:
+            List of fills for compatibility with strategies.
+        """
+        params = {
+            "category": "linear",
+            "limit": str(limit)
+        }
+        if symbol:
+            params["symbol"] = symbol
+            
+        response = self.make_request(
+            method="GET",
+            endpoint="/cloud/trade/v3/execution/list",
+            params=params
+        )
+        
+        if "error" in response:
+            return response
+            
+        fills = []
+        result = response.get("result", {})
+        fill_list = result.get("list", [])
+        
+        for fill in fill_list:
+            # Normalize to strategy-expected format
+            side = fill.get("side", "").upper()
+            is_maker = fill.get("isMaker", False)
+            
+            fills.append({
+                "id": fill.get("execId"),
+                "fill_id": fill.get("execId"),
+                "order_id": fill.get("orderId"),
+                "symbol": fill.get("symbol"),
+                "side": "BUY" if side == "BUY" else "SELL",
+                "price": float(fill.get("execPrice", 0)),
+                "quantity": float(fill.get("execQty", 0)),
+                "size": float(fill.get("execQty", 0)),
+                "is_maker": is_maker,
+                "fee": float(fill.get("execFee", 0)),
+                "fee_asset": fill.get("feeCurrency", "USDT"),
+                "realized_pnl": float(fill.get("closedPnl", 0)),
+                "timestamp": fill.get("execTime"),
+                "raw": fill
+            })
+        
+        return fills
 
     # ------------------------------------------------------------------
     # Helper Methods

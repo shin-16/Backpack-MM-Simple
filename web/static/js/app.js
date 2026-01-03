@@ -619,8 +619,8 @@ function updateStatsDisplay(stats) {
     updateStatValue('statBuySell', `${stats.buy_trades || 0} / ${stats.sell_trades || 0}`);
 
     // 更新成交額和手續費
-    updateStatValue('statVolumeUSDC', stats.total_volume_usdc ? `$${stats.total_volume_usdc.toFixed(2)}` : '--');
-    updateStatValue('statFees', stats.total_fees ? `${stats.total_fees.toFixed(4)} ${stats.quote_asset || ''}` : '--');
+    updateStatValue('statVolumeUSDC', (stats.total_volume_usdc !== undefined && stats.total_volume_usdc !== null) ? `$${stats.total_volume_usdc.toFixed(2)}` : '--');
+    updateStatValue('statFees', (stats.total_fees !== undefined && stats.total_fees !== null) ? `${stats.total_fees.toFixed(4)} ${stats.quote_asset || ''}` : '--');
 
     // 更新磨損率
     if (stats.slippage_rate !== undefined && stats.slippage_rate !== null) {

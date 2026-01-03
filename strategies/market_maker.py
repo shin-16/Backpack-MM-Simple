@@ -1916,6 +1916,10 @@ class MarketMaker:
         self.active_sell_orders = []
     
     def check_order_fills(self):
+        # Log current tracking state
+        active_ids = [o.get('id') for o in self.active_buy_orders + self.active_sell_orders]
+        logger.info(f"[DEBUG] 追蹤中的訂單IDs: {active_ids[:5]}... (共{len(active_ids)}個)")
+        
         open_orders = self.client.get_open_orders(self.symbol)
         if isinstance(open_orders, dict) and "error" in open_orders:
             logger.error(f"獲取訂單失敗: {open_orders['error']}")
@@ -1926,6 +1930,9 @@ class MarketMaker:
                 order_id = order.get('id')
                 if order_id:
                     current_order_ids.add(order_id)
+        
+        logger.info(f"[DEBUG] 當前開放訂單IDs: {list(current_order_ids)[:5]}... (共{len(current_order_ids)}個)")
+        
         prev_buy_orders = len(self.active_buy_orders)
         prev_sell_orders = len(self.active_sell_orders)
         filled_order_ids = []
@@ -1936,15 +1943,19 @@ class MarketMaker:
         filled_trades = []
         if filled_order_ids:
             try:
+                logger.info(f"[DEBUG] 檢測到可能成交的訂單: {filled_order_ids}")
                 recent_fills_raw = self.client.get_fill_history(self.symbol, limit=50)
+                logger.info(f"[DEBUG] 成交歷史響應: {type(recent_fills_raw)}, 長度: {len(recent_fills_raw) if isinstance(recent_fills_raw, list) else 'N/A'}")
                 if recent_fills_raw and not (isinstance(recent_fills_raw, dict) and "error" in recent_fills_raw):
                     # 使用統一的格式處理方法
                     recent_fills = self._normalize_fill_history_response(recent_fills_raw)
+                    logger.info(f"[DEBUG] 標準化後成交記錄數: {len(recent_fills)}")
                     if not hasattr(self, '_processed_fill_ids'):
                         self._processed_fill_ids = set()
                     for fill in recent_fills:
                         fill_id = fill.get('fill_id') or fill.get('id')
                         fill_order_id = fill.get('order_id')
+                        logger.info(f"[DEBUG] 檢查成交: fill_id={fill_id}, order_id={fill_order_id}")
                         if fill_id in self._processed_fill_ids:
                             continue
                         if fill_order_id in filled_order_ids:
