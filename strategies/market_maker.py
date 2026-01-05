@@ -1944,7 +1944,7 @@ class MarketMaker:
         if filled_order_ids:
             try:
                 logger.info(f"[DEBUG] 檢測到可能成交的訂單: {filled_order_ids}")
-                recent_fills_raw = self.client.get_fill_history(self.symbol, limit=50)
+                recent_fills_raw = self.client.get_fill_history(self.symbol, limit=200)
                 logger.info(f"[DEBUG] 成交歷史響應: {type(recent_fills_raw)}, 長度: {len(recent_fills_raw) if isinstance(recent_fills_raw, list) else 'N/A'}")
                 if recent_fills_raw and not (isinstance(recent_fills_raw, dict) and "error" in recent_fills_raw):
                     # 使用統一的格式處理方法
