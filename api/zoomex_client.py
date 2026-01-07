@@ -35,6 +35,7 @@ class ZoomexClient(BaseExchangeClient):
         self.base_url = config.get("base_url", self.DEFAULT_BASE_URL)
         self.recv_window = config.get("recv_window", "5000")
         self.category = config.get("category", "linear")  # linear, inverse, spot
+        self.position_mode = config.get("position_mode", "hedge")  # "hedge" or "one_way"
 
         # Proxy configuration
         self.proxies = get_proxy_config()
@@ -456,6 +457,44 @@ class ZoomexClient(BaseExchangeClient):
         
         return positions
 
+    def _get_position_idx(self, side: str, order_details: Dict) -> int:
+        """Get the correct positionIdx based on position mode and order side.
+        
+        Args:
+            side: Normalized order side ("Buy" or "Sell")
+            order_details: Order details dict (may contain explicit positionIdx)
+            
+        Returns:
+            positionIdx: 0 for one-way, 1 for hedge-long, 2 for hedge-short
+            
+        Hedge Mode Logic:
+            - Open Long (Buy): positionIdx=1
+            - Open Short (Sell): positionIdx=2
+            - Close Long (Sell + reduceOnly): positionIdx=1 (same as Long position)
+            - Close Short (Buy + reduceOnly): positionIdx=2 (same as Short position)
+        """
+        # Allow explicit override from order_details
+        if "positionIdx" in order_details:
+            return order_details["positionIdx"]
+        
+        # One-way mode: always use 0
+        if self.position_mode == "one_way":
+            return 0
+        
+        # Hedge mode: check if this is a closing order (reduceOnly)
+        reduce_only = order_details.get("reduceOnly", False)
+        
+        if reduce_only:
+            # Closing position: positionIdx matches the POSITION being closed
+            # Sell to close Long -> positionIdx=1
+            # Buy to close Short -> positionIdx=2
+            return 1 if side == "Sell" else 2
+        else:
+            # Opening position: positionIdx matches the POSITION being opened
+            # Buy to open Long -> positionIdx=1
+            # Sell to open Short -> positionIdx=2
+            return 1 if side == "Buy" else 2
+
     # ------------------------------------------------------------------
     # Order Methods (Private)
     # ------------------------------------------------------------------
@@ -504,7 +543,7 @@ class ZoomexClient(BaseExchangeClient):
             "side": normalized_side,
             "orderType": order_details.get("orderType", "Limit"),
             "qty": str(qty),
-            "positionIdx": order_details.get("positionIdx", 0)
+            "positionIdx": self._get_position_idx(normalized_side, order_details)
         }
         
         # Optional fields
