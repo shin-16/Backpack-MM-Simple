@@ -553,7 +553,7 @@ class ZoomexClient(BaseExchangeClient):
         if order_details.get("timeInForce"):
             data["timeInForce"] = order_details["timeInForce"]
         else:
-            data["timeInForce"] = "GTC"
+            data["timeInForce"] = "PostOnly"
         
         if order_details.get("orderLinkId"):
             data["orderLinkId"] = order_details["orderLinkId"]
