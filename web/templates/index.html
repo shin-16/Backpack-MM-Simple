@@ -337,6 +337,19 @@
                                         <input type="number" id="take_profit" name="take_profit" class="field-input"
                                             step="0.01" placeholder="可選">
                                     </div>
+
+                                    <!-- Zoomex Leverage Control -->
+                                    <div class="form-field leverage-field" id="leverageField" style="display: none;">
+                                        <label class="field-label">槓桿倍數</label>
+                                        <div class="leverage-input-group">
+                                            <input type="number" id="leverage" name="leverage" class="field-input leverage-input"
+                                                value="20" min="1" max="100" step="1">
+                                            <button type="button" id="setLeverageBtn" class="btn btn-secondary btn-small">
+                                                設置槓桿
+                                            </button>
+                                        </div>
+                                        <small class="field-hint" id="leverageHint">點擊按鈕設置 Zoomex 槓桿</small>
+                                    </div>
                                 </div>
                             </div>
 

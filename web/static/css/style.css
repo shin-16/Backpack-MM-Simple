@@ -925,3 +925,46 @@ section:hover {
 .text-primary-color {
     color: var(--primary) !important;
 }
+
+/* ==================== Leverage Control ==================== */
+.leverage-input-group {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: stretch;
+}
+
+.leverage-input-group .leverage-input {
+    flex: 1;
+    min-width: 80px;
+}
+
+.leverage-input-group .btn-small {
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-tertiary) 100%);
+    color: var(--text-primary);
+    border: 1px solid var(--border-secondary);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    border-color: var(--primary);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md), 0 0 15px rgba(20, 184, 166, 0.3);
+}
+
+.field-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+    transition: color var(--transition-base);
+}

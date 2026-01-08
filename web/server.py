@@ -484,6 +484,100 @@ def get_config():
     })
 
 
+@app.route('/api/set_leverage', methods=['POST'])
+def set_leverage():
+    """設置 Zoomex 槓桿倍數"""
+    try:
+        data = request.json
+        symbol = data.get('symbol', '')
+        leverage = int(data.get('leverage', 20))
+        
+        # 驗證參數
+        if not symbol:
+            return jsonify({'success': False, 'message': '請提供交易對'}), 400
+        
+        if leverage < 1 or leverage > 100:
+            return jsonify({'success': False, 'message': '槓桿倍數必須在 1-100 之間'}), 400
+        
+        # 創建 Zoomex 客户端
+        from api.zoomex_client import ZoomexClient
+        
+        api_key = os.getenv('ZOOMEX_API_KEY', '')
+        secret_key = os.getenv('ZOOMEX_API_SECRET', '')
+        base_url = os.getenv('ZOOMEX_BASE_URL', 'https://openapi.zoomex.com')
+        
+        if not api_key or not secret_key:
+            return jsonify({'success': False, 'message': 'Zoomex API 密鑰未配置'}), 400
+        
+        client = ZoomexClient({
+            'api_key': api_key,
+            'api_secret': secret_key,
+            'base_url': base_url,
+        })
+        
+        # 設置槓桿
+        result = client.set_leverage(symbol, leverage)
+        
+        if 'error' in result:
+            return jsonify({'success': False, 'message': f'設置槓桿失敗: {result["error"]}'}), 500
+        
+        logger.info(f"成功設置 {symbol} 槓桿為 {leverage}x")
+        return jsonify({
+            'success': True,
+            'message': f'成功設置 {symbol} 槓桿為 {leverage}x',
+            'leverage': leverage,
+            'symbol': symbol
+        })
+        
+    except Exception as e:
+        logger.error(f"設置槓桿失敗: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'設置槓桿失敗: {str(e)}'}), 500
+
+
+@app.route('/api/get_leverage', methods=['GET'])
+def get_leverage():
+    """獲取 Zoomex 當前槓桿倍數"""
+    try:
+        symbol = request.args.get('symbol', '')
+        
+        if not symbol:
+            return jsonify({'success': False, 'message': '請提供交易對'}), 400
+        
+        # 創建 Zoomex 客户端
+        from api.zoomex_client import ZoomexClient
+        
+        api_key = os.getenv('ZOOMEX_API_KEY', '')
+        secret_key = os.getenv('ZOOMEX_API_SECRET', '')
+        base_url = os.getenv('ZOOMEX_BASE_URL', 'https://openapi.zoomex.com')
+        
+        if not api_key or not secret_key:
+            return jsonify({'success': False, 'message': 'Zoomex API 密鑰未配置'}), 400
+        
+        client = ZoomexClient({
+            'api_key': api_key,
+            'api_secret': secret_key,
+            'base_url': base_url,
+        })
+        
+        # 獲取槓桿
+        result = client.get_leverage(symbol)
+        
+        if 'error' in result:
+            return jsonify({'success': False, 'message': f'獲取槓桿失敗: {result["error"]}'}), 500
+        
+        return jsonify({
+            'success': True,
+            'leverage': result.get('leverage', 20),
+            'symbol': symbol
+        })
+        
+    except Exception as e:
+        logger.error(f"獲取槓桿失敗: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'獲取槓桿失敗: {str(e)}'}), 500
+
+
 @socketio.on('connect')
 def handle_connect():
     """WebSocket連接建立"""

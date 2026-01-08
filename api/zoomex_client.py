@@ -730,6 +730,83 @@ class ZoomexClient(BaseExchangeClient):
         return fills
 
     # ------------------------------------------------------------------
+    # Leverage Management
+    # ------------------------------------------------------------------
+
+    def set_leverage(self, symbol: str, leverage: int = 20) -> Dict:
+        """Set leverage for a symbol.
+        
+        Endpoint: POST /cloud/trade/v3/position/set-leverage
+        
+        Args:
+            symbol: Trading pair (e.g., "BTCUSDT")
+            leverage: Leverage value (1-100), default 20
+            
+        Returns:
+            API response dict with success or error
+        """
+        # Clamp leverage to valid range
+        leverage = max(1, min(100, leverage))
+        leverage_str = str(leverage)
+        
+        payload = {
+            "category": "linear",
+            "symbol": symbol,
+            "buyLeverage": leverage_str,
+            "sellLeverage": leverage_str,
+        }
+        
+        logger.info(f"Setting leverage for {symbol} to {leverage}x")
+        
+        response = self.make_request(
+            method="POST",
+            endpoint="/cloud/trade/v3/position/set-leverage",
+            data=payload
+        )
+        
+        if "error" in response:
+            logger.error(f"Failed to set leverage: {response}")
+            return response
+        
+        logger.info(f"Successfully set leverage for {symbol} to {leverage}x")
+        return {
+            "success": True,
+            "symbol": symbol,
+            "leverage": leverage,
+            "raw": response
+        }
+
+    def get_leverage(self, symbol: str) -> Dict:
+        """Get current leverage for a symbol from position info.
+        
+        Args:
+            symbol: Trading pair (e.g., "BTCUSDT")
+            
+        Returns:
+            Dict with current leverage or error
+        """
+        positions = self.get_positions(symbol)
+        
+        if isinstance(positions, dict) and "error" in positions:
+            return positions
+        
+        if positions and len(positions) > 0:
+            pos = positions[0]
+            return {
+                "symbol": symbol,
+                "leverage": pos.get("leverage", 1),
+                "success": True
+            }
+        
+        # No position, return default
+        return {
+            "symbol": symbol,
+            "leverage": 20,  # Default Zoomex leverage
+            "success": True,
+            "note": "No active position, returning default leverage"
+        }
+
+    # ------------------------------------------------------------------
     # Helper Methods
     # ------------------------------------------------------------------
 

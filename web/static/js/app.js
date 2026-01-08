@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleSpreadField();
     toggleGridTypeField();
     toggleIntervalField();
+    toggleLeverageField();
 });
 
 // 初始化WebSocket連接
@@ -135,6 +136,7 @@ function setupEventListeners() {
         toggleMarketTypeParams();
         toggleGridTypeField();
         toggleSpreadField();
+        toggleLeverageField();
     });
 
     // 策略切換
@@ -149,12 +151,22 @@ function setupEventListeners() {
         adjustMarketTypeOptions();
         // 針對有WebSocket的交易所隱藏間隔設定
         toggleIntervalField();
+        // 切換槓桿欄位顯示
+        toggleLeverageField();
     });
 
     // 自動價格範圍切換
     autoPriceRangeCheckbox.addEventListener('change', () => {
         togglePriceRangeMode();
     });
+
+    // 槓桿設置按鈕
+    const setLeverageBtn = document.getElementById('setLeverageBtn');
+    if (setLeverageBtn) {
+        setLeverageBtn.addEventListener('click', async () => {
+            await setLeverage();
+        });
+    }
 }
 
 // 切換間隔設定欄位（有WebSocket的交易所隱藏）
@@ -324,6 +336,99 @@ function togglePerpFields() {
             maxOrdersPerpField.style.display = 'none';
         } else {
             maxOrdersPerpField.style.display = 'block';
+        }
+    }
+}
+
+// 切換槓桿欄位顯示（僅在 Zoomex 永續合約時顯示）
+function toggleLeverageField() {
+    const exchange = exchangeSelect.value;
+    const marketType = marketTypeSelect.value;
+    const leverageField = document.getElementById('leverageField');
+
+    if (leverageField) {
+        if (exchange === 'zoomex' && marketType === 'perp') {
+            leverageField.style.display = 'block';
+        } else {
+            leverageField.style.display = 'none';
+        }
+    }
+}
+
+// 設置槓桿
+async function setLeverage() {
+    const symbol = document.getElementById('symbol').value;
+    const leverage = parseInt(document.getElementById('leverage').value);
+    const leverageHint = document.getElementById('leverageHint');
+    const setLeverageBtn = document.getElementById('setLeverageBtn');
+
+    if (!symbol) {
+        addLog('請先輸入交易對', 'error');
+        if (leverageHint) {
+            leverageHint.textContent = '請先輸入交易對';
+            leverageHint.style.color = '#ef4444';
+        }
+        return;
+    }
+
+    if (leverage < 1 || leverage > 100) {
+        addLog('槓桿倍數必須在 1-100 之間', 'error');
+        if (leverageHint) {
+            leverageHint.textContent = '槓桿倍數必須在 1-100 之間';
+            leverageHint.style.color = '#ef4444';
+        }
+        return;
+    }
+
+    // 顯示加載狀態
+    if (setLeverageBtn) {
+        setLeverageBtn.disabled = true;
+        setLeverageBtn.textContent = '設置中...';
+    }
+    if (leverageHint) {
+        leverageHint.textContent = '正在設置槓桿...';
+        leverageHint.style.color = '#6b7280';
+    }
+
+    try {
+        const response = await fetch('/api/set_leverage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                symbol: symbol,
+                leverage: leverage
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            addLog(`成功設置 ${symbol} 槓桿為 ${leverage}x`, 'success');
+            if (leverageHint) {
+                leverageHint.textContent = `已設置 ${leverage}x 槓桿`;
+                leverageHint.style.color = '#10b981';
+            }
+        } else {
+            addLog(`設置槓桿失敗: ${result.message}`, 'error');
+            if (leverageHint) {
+                leverageHint.textContent = `設置失敗: ${result.message}`;
+                leverageHint.style.color = '#ef4444';
+            }
+        }
+    } catch (error) {
+        console.error('設置槓桿失敗:', error);
+        addLog(`設置槓桿失敗: ${error.message}`, 'error');
+        if (leverageHint) {
+            leverageHint.textContent = `設置失敗: ${error.message}`;
+            leverageHint.style.color = '#ef4444';
+        }
+    } finally {
+        // 恢復按鈕狀態
+        if (setLeverageBtn) {
+            setLeverageBtn.disabled = false;
+            setLeverageBtn.textContent = '設置槓桿';
         }
     }
 }
